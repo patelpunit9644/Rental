@@ -1,0 +1,108 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  ADMIN
+  EMPLOYEE
+}
+
+enum CarStatus {
+  AVAILABLE
+  ON_RENT
+  MAINTENANCE
+  DECOMMISSIONED
+}
+
+enum RentalStatus {
+  ACTIVE
+  COMPLETED
+  OVERDUE
+  CANCELLED
+}
+
+enum FuelLevel {
+  QUARTER
+  HALF
+  THREE_QUARTERS
+  FULL
+}
+
+model User {
+  firebaseUid String   @id // Matches Firebase Auth UID
+  name        String
+  email       String   @unique
+  role        Role     @default(EMPLOYEE)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  rentalsProcessed Rental[] @relation("EmployeeRentals")
+}
+
+model Car {
+  id           String    @id @default(cuid())
+  make         String
+  model        String
+  year         Int
+  licensePlate String    @unique
+  vin          String?   @unique
+  color        String
+  dailyRate    Float
+  currentOdo   Int
+  status       CarStatus @default(AVAILABLE)
+  needsService Boolean   @default(false)
+  
+  rentals      Rental[]
+}
+
+model Rental {
+  id                 String       @id @default(cuid())
+  carId              String
+  employeeId         String
+  customerName       String
+  customerPhone      String
+  customerEmail      String?
+  customerLicenseNum String
+  licensePhotoUrl    String       // Firebase Storage URL
+  
+  pickupDate         DateTime
+  expectedReturnDate DateTime
+  actualReturnDate   DateTime?
+  
+  startMileage       Int
+  endMileage         Int?
+  startFuel          FuelLevel
+  endFuel            FuelLevel?
+  
+  totalCostExpected  Float
+  totalCostCollected Float?
+  depositCollected   Float
+  depositReturned    Boolean      @default(false)
+  status             RentalStatus @default(ACTIVE)
+  
+  createdAt          DateTime     @default(now())
+
+  car                Car            @relation(fields: [carId], references: [id])
+  employee           User           @relation("EmployeeRentals", fields: [employeeId], references: [firebaseUid])
+  conditionLogs      ConditionLog[]
+}
+
+model ConditionLog {
+  id        String   @id @default(cuid())
+  rentalId  String
+  type      LogType  // DEPARTURE or RETURN
+  notes     String?
+  photoUrls String[] // Array of Firebase Storage URLs
+
+  rental    Rental   @relation(fields: [rentalId], references: [id], onDelete: Cascade)
+}
+
+enum LogType {
+  DEPARTURE
+  RETURN
+}
