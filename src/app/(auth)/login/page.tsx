@@ -9,8 +9,6 @@ import { Car, Lock, Mail, AlertCircle, Loader2 } from 'lucide-react';
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isRegister, setIsRegister] = useState(false);
-  const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
@@ -21,14 +19,8 @@ export default function LoginPage() {
     setError('');
 
     try {
-      let userCredential;
-      if (isRegister) {
-        // Register flow
-        userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      } else {
-        // Login flow
-        userCredential = await signInWithEmailAndPassword(auth, email, password);
-      }
+      // Login flow only
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
       
       const idToken = await userCredential.user.getIdToken();
 
@@ -81,10 +73,6 @@ export default function LoginPage() {
       const firebaseError = err as { code?: string; message?: string };
       if (firebaseError.code === 'auth/wrong-password' || firebaseError.code === 'auth/user-not-found') {
         message = 'Invalid email or password.';
-      } else if (firebaseError.code === 'auth/email-already-in-use') {
-        message = 'This email is already registered.';
-      } else if (firebaseError.code === 'auth/weak-password') {
-        message = 'Password should be at least 6 characters.';
       } else if (err instanceof Error) {
         message = err.message;
       }
@@ -117,7 +105,7 @@ export default function LoginPage() {
         {/* Login Card */}
         <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-3xl p-8 shadow-2xl">
           <h2 className="text-xl font-bold text-white mb-6">
-            {isRegister ? 'Create Staff Account' : 'Sign In to Portal'}
+            Sign In to Portal
           </h2>
 
           {error && (
@@ -128,27 +116,6 @@ export default function LoginPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            {isRegister && (
-              <div>
-                <label className="block text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
-                  Full Name
-                </label>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-500">
-                    <Car className="w-4 h-4" />
-                  </span>
-                  <input
-                    type="text"
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="John Doe"
-                    className="w-full bg-slate-950/40 border border-slate-800 focus:border-blue-500 rounded-xl py-3 pl-10 pr-4 text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500 transition"
-                  />
-                </div>
-              </div>
-            )}
-
             <div>
               <label className="block text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
                 Email Address
@@ -199,25 +166,11 @@ export default function LoginPage() {
                   <Loader2 className="w-5 h-5 animate-spin mr-2" />
                   Processing...
                 </>
-              ) : isRegister ? (
-                'Register & Sign In'
               ) : (
                 'Sign In to Dashboard'
               )}
             </button>
           </form>
-
-          <div className="text-center mt-6">
-            <button
-              onClick={() => {
-                setIsRegister(!isRegister);
-                setError('');
-              }}
-              className="text-xs text-slate-400 hover:text-emerald-400 transition"
-            >
-              {isRegister ? 'Already have an account? Sign In' : 'Need an account? Register First User (Admin)'}
-            </button>
-          </div>
         </div>
       </div>
     </div>

@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email missing from auth provider' }, { status: 400 });
     }
 
-    // Check if user exists in database, otherwise create as EMPLOYEE (first user as ADMIN)
+    // Check if user exists in database
     const existingUser = await prisma.user.findUnique({
       where: { firebaseUid: uid },
     });
@@ -35,7 +35,20 @@ export async function POST(request: NextRequest) {
       expectedRole = existingUser.role;
     } else {
       const userCount = await prisma.user.count();
-      expectedRole = userCount === 0 ? 'ADMIN' : 'EMPLOYEE';
+      if (userCount > 0) {
+        // Block external registrations since first user exists
+        try {
+          await adminAuth.deleteUser(uid);
+        } catch (e) {
+          console.error('Failed to clean up unauthorized Firebase user:', e);
+        }
+        return NextResponse.json(
+          { error: 'Registration is disabled. Please contact your administrator.' },
+          { status: 403 }
+        );
+      }
+      // First user bootstraps as ADMIN
+      expectedRole = 'ADMIN';
     }
 
     // Check if the current ID token already includes the correct role claim
