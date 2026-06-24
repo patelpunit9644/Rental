@@ -15,6 +15,9 @@ export interface CarInput {
   dailyRate: number;
   currentOdo: number;
   status?: CarStatus;
+  seatingCapacity?: number;
+  transmission?: string;
+  type?: string;
 }
 
 async function requireAdmin() {
@@ -51,6 +54,9 @@ export async function createCar(data: CarInput) {
         dailyRate: data.dailyRate,
         currentOdo: data.currentOdo,
         status: data.status || CarStatus.AVAILABLE,
+        seatingCapacity: data.seatingCapacity ?? 5,
+        transmission: data.transmission ?? 'Automatic',
+        type: data.type ?? 'Sedan',
       },
     });
     revalidatePath('/admin/fleet');

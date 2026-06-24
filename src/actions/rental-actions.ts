@@ -33,6 +33,19 @@ export interface CheckoutInput {
   depositCollected: number;
   notes?: string | null;
   photoUrls: string[];
+  reservationId?: string; // Optional ID if transitioning from a booking
+}
+
+export interface ReservationInput {
+  carId: string;
+  employeeId: string;
+  customerName: string;
+  customerPhone: string;
+  customerEmail?: string | null;
+  customerLicenseNum: string;
+  pickupDate: Date | string;
+  expectedReturnDate: Date | string;
+  totalCostExpected: number;
 }
 
 export interface CheckinInput {
@@ -48,7 +61,8 @@ export interface CheckinInput {
 }
 
 /**
- * Creates a rental agreement, updates the car status to ON_RENT, and logs the departure condition.
+ * Creates a rental agreement (or transitions an existing RESERVED booking to ACTIVE),
+ * updates the car status to ON_RENT, and logs the departure condition.
  */
 export async function checkoutCar(data: CheckoutInput) {
   try {
@@ -66,7 +80,7 @@ export async function checkoutCar(data: CheckoutInput) {
       return { success: false, error: 'Invalid dates provided.' };
     }
 
-    // 2. Fetch car and verify availability
+    // 2. Fetch car and verify status
     const car = await prisma.car.findUnique({
       where: { id: data.carId },
     });
@@ -75,43 +89,89 @@ export async function checkoutCar(data: CheckoutInput) {
       return { success: false, error: 'Car not found.' };
     }
 
-    if (car.status !== CarStatus.AVAILABLE) {
-      return { success: false, error: `Car is not available for rent. Current status: ${car.status}` };
+    // If direct checkout (not from reservation), the car must be AVAILABLE
+    if (!data.reservationId && car.status !== CarStatus.AVAILABLE) {
+      return { success: false, error: `Car is not available for direct checkout. Status: ${car.status}` };
     }
 
-    // 3. Process checkout transaction
-    const rental = await prisma.$transaction(async (tx) => {
-      // Create Rental record
-      const newRental = await tx.rental.create({
-        data: {
-          carId: data.carId,
-          employeeId: data.employeeId,
-          customerName: data.customerName,
-          customerPhone: data.customerPhone,
-          customerEmail: data.customerEmail,
-          customerLicenseNum: data.customerLicenseNum,
-          licensePhotoUrl: data.licensePhotoUrl,
-          pickupDate,
-          expectedReturnDate,
-          startMileage: data.startMileage,
-          startFuel: data.startFuel,
-          totalCostExpected: data.totalCostExpected,
-          depositCollected: data.depositCollected,
-          status: RentalStatus.ACTIVE,
+    // 3. Double-Booking Overlap Validation
+    const overlaps = await prisma.rental.findFirst({
+      where: {
+        carId: data.carId,
+        status: {
+          in: [RentalStatus.ACTIVE, RentalStatus.OVERDUE, RentalStatus.RESERVED],
         },
-      });
+        NOT: data.reservationId ? { id: data.reservationId } : undefined,
+        pickupDate: {
+          lt: expectedReturnDate,
+        },
+        expectedReturnDate: {
+          gt: pickupDate,
+        },
+      },
+    });
+
+    if (overlaps) {
+      return { success: false, error: 'This vehicle has an overlapping rental or reservation during the selected date range.' };
+    }
+
+    // 4. Process checkout transaction
+    const rental = await prisma.$transaction(async (tx) => {
+      let activeRental;
+
+      if (data.reservationId) {
+        // Upgrade reservation to active rental
+        activeRental = await tx.rental.update({
+          where: { id: data.reservationId },
+          data: {
+            employeeId: data.employeeId,
+            customerName: data.customerName,
+            customerPhone: data.customerPhone,
+            customerEmail: data.customerEmail,
+            customerLicenseNum: data.customerLicenseNum,
+            licensePhotoUrl: data.licensePhotoUrl,
+            pickupDate,
+            expectedReturnDate,
+            startMileage: data.startMileage,
+            startFuel: data.startFuel,
+            totalCostExpected: data.totalCostExpected,
+            depositCollected: data.depositCollected,
+            status: RentalStatus.ACTIVE,
+          },
+        });
+      } else {
+        // Create new direct checkout record
+        activeRental = await tx.rental.create({
+          data: {
+            carId: data.carId,
+            employeeId: data.employeeId,
+            customerName: data.customerName,
+            customerPhone: data.customerPhone,
+            customerEmail: data.customerEmail,
+            customerLicenseNum: data.customerLicenseNum,
+            licensePhotoUrl: data.licensePhotoUrl,
+            pickupDate,
+            expectedReturnDate,
+            startMileage: data.startMileage,
+            startFuel: data.startFuel,
+            totalCostExpected: data.totalCostExpected,
+            depositCollected: data.depositCollected,
+            status: RentalStatus.ACTIVE,
+          },
+        });
+      }
 
       // Create ConditionLog for Departure
       await tx.conditionLog.create({
         data: {
-          rentalId: newRental.id,
+          rentalId: activeRental.id,
           type: LogType.DEPARTURE,
           notes: data.notes,
           photoUrls: data.photoUrls,
         },
       });
 
-      // Update Car Status and Odometer to match checkout
+      // Update Car Status and Odometer
       await tx.car.update({
         where: { id: data.carId },
         data: {
@@ -120,10 +180,10 @@ export async function checkoutCar(data: CheckoutInput) {
         },
       });
 
-      return newRental;
+      return activeRental;
     });
 
-    // Revalidate relevant pages
+    // Revalidate paths
     revalidatePath('/admin/dashboard');
     revalidatePath('/employee/dashboard');
     revalidatePath('/admin/fleet');
@@ -133,6 +193,136 @@ export async function checkoutCar(data: CheckoutInput) {
   } catch (error) {
     console.error('Checkout error:', error);
     const message = error instanceof Error ? error.message : 'An error occurred during checkout.';
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Creates a pre-booking reservation (RESERVED) for a car with double-booking validation.
+ */
+export async function createReservation(data: ReservationInput) {
+  try {
+    await requireAuth();
+
+    // 1. Validate inputs
+    if (!data.carId || !data.employeeId || !data.customerName || !data.customerLicenseNum) {
+      return { success: false, error: 'Required fields are missing.' };
+    }
+
+    const pickupDate = new Date(data.pickupDate);
+    const expectedReturnDate = new Date(data.expectedReturnDate);
+
+    if (isNaN(pickupDate.getTime()) || isNaN(expectedReturnDate.getTime())) {
+      return { success: false, error: 'Invalid dates provided.' };
+    }
+
+    if (expectedReturnDate <= pickupDate) {
+      return { success: false, error: 'Return date must be after pickup date.' };
+    }
+
+    // 2. Fetch car details
+    const car = await prisma.car.findUnique({
+      where: { id: data.carId },
+    });
+
+    if (!car) {
+      return { success: false, error: 'Vehicle not found.' };
+    }
+
+    if (car.status === CarStatus.DECOMMISSIONED) {
+      return { success: false, error: 'Decommissioned vehicles cannot be reserved.' };
+    }
+
+    // 3. Double-Booking Overlap Validation
+    const overlaps = await prisma.rental.findFirst({
+      where: {
+        carId: data.carId,
+        status: {
+          in: [RentalStatus.ACTIVE, RentalStatus.OVERDUE, RentalStatus.RESERVED],
+        },
+        pickupDate: {
+          lt: expectedReturnDate,
+        },
+        expectedReturnDate: {
+          gt: pickupDate,
+        },
+      },
+    });
+
+    if (overlaps) {
+      return { success: false, error: 'This vehicle has an overlapping rental or reservation during the selected date range.' };
+    }
+
+    // 4. Create reservation
+    const rental = await prisma.rental.create({
+      data: {
+        carId: data.carId,
+        employeeId: data.employeeId,
+        customerName: data.customerName,
+        customerPhone: data.customerPhone,
+        customerEmail: data.customerEmail,
+        customerLicenseNum: data.customerLicenseNum,
+        licensePhotoUrl: '', // To be filled during check-out release
+        pickupDate,
+        expectedReturnDate,
+        startMileage: car.currentOdo, // Default placeholder
+        startFuel: FuelLevel.FULL, // Default placeholder
+        totalCostExpected: data.totalCostExpected,
+        depositCollected: 0, // Deposit is collected when vehicle is released
+        status: RentalStatus.RESERVED,
+      },
+    });
+
+    // Revalidate paths
+    revalidatePath('/admin/dashboard');
+    revalidatePath('/employee/dashboard');
+    revalidatePath('/admin/fleet');
+    revalidatePath('/admin/ledger');
+
+    return { success: true, rentalId: rental.id };
+  } catch (error) {
+    console.error('Reservation error:', error);
+    const message = error instanceof Error ? error.message : 'An error occurred during reservation.';
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Cancels a pre-booked reservation.
+ */
+export async function cancelReservation(rentalId: string) {
+  try {
+    await requireAuth();
+
+    const rental = await prisma.rental.findUnique({
+      where: { id: rentalId },
+    });
+
+    if (!rental) {
+      return { success: false, error: 'Reservation record not found.' };
+    }
+
+    if (rental.status !== RentalStatus.RESERVED) {
+      return { success: false, error: 'Only pending reservations can be cancelled.' };
+    }
+
+    await prisma.rental.update({
+      where: { id: rentalId },
+      data: {
+        status: RentalStatus.CANCELLED,
+      },
+    });
+
+    // Revalidate paths
+    revalidatePath('/admin/dashboard');
+    revalidatePath('/employee/dashboard');
+    revalidatePath('/admin/fleet');
+    revalidatePath('/admin/ledger');
+
+    return { success: true };
+  } catch (error) {
+    console.error('Cancel reservation error:', error);
+    const message = error instanceof Error ? error.message : 'An error occurred while cancelling the reservation.';
     return { success: false, error: message };
   }
 }

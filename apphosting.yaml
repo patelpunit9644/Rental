@@ -1,0 +1,8 @@
+# apphosting.yaml
+# Firebase App Hosting configuration file.
+# Learn more: https://firebase.google.com/docs/app-hosting/configure
+
+# Environment variables configuration
+env:
+  - variable: NEXT_PUBLIC_APP_URL
+    value: "http://localhost:3000"

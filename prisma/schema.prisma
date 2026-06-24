@@ -24,6 +24,7 @@ enum RentalStatus {
   COMPLETED
   OVERDUE
   CANCELLED
+  RESERVED
 }
 
 enum FuelLevel {
@@ -56,6 +57,11 @@ model Car {
   currentOdo   Int
   status       CarStatus @default(AVAILABLE)
   needsService Boolean   @default(false)
+  
+  // Custom vehicle specifications
+  seatingCapacity Int       @default(5)
+  type            String    @default("Sedan")
+  transmission    String    @default("Automatic")
   
   rentals      Rental[]
 }

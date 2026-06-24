@@ -32,22 +32,33 @@ function getUniqueFileName(prefix: string, name: string): string {
   return `${prefix}/${Date.now()}_${name}`;
 }
 
+interface Rental {
+  id: string;
+  customerName: string;
+  customerPhone: string;
+  customerEmail: string | null;
+  customerLicenseNum: string;
+  pickupDate: Date;
+  expectedReturnDate: Date;
+}
+
 interface CheckoutWizardProps {
   car: Car;
   employeeId: string;
+  rental?: Rental;
 }
 
-export default function CheckoutWizard({ car, employeeId }: CheckoutWizardProps) {
+export default function CheckoutWizard({ car, employeeId, rental }: CheckoutWizardProps) {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   // Step 1 State: Customer Information
-  const [customerName, setCustomerName] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
-  const [customerEmail, setCustomerEmail] = useState('');
-  const [customerLicenseNum, setCustomerLicenseNum] = useState('');
+  const [customerName, setCustomerName] = useState(rental?.customerName || '');
+  const [customerPhone, setCustomerPhone] = useState(rental?.customerPhone || '');
+  const [customerEmail, setCustomerEmail] = useState(rental?.customerEmail || '');
+  const [customerLicenseNum, setCustomerLicenseNum] = useState(rental?.customerLicenseNum || '');
   const [licensePhotoFile, setLicensePhotoFile] = useState<File | null>(null);
 
   // Step 2 State: Rental Details
@@ -85,12 +96,12 @@ export default function CheckoutWizard({ car, employeeId }: CheckoutWizardProps)
     };
 
     const t = setTimeout(() => {
-      setPickupDate(formatDateStr(today));
-      setExpectedReturnDate(formatDateStr(tomorrow));
+      setPickupDate(rental ? formatDateStr(new Date(rental.pickupDate)) : formatDateStr(today));
+      setExpectedReturnDate(rental ? formatDateStr(new Date(rental.expectedReturnDate)) : formatDateStr(tomorrow));
     }, 0);
 
     return () => clearTimeout(t);
-  }, []);
+  }, [rental]);
 
   // File Change Handlers
   const handleLicensePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -218,6 +229,7 @@ export default function CheckoutWizard({ car, employeeId }: CheckoutWizardProps)
         depositCollected: parseFloat(depositCollected) || 0,
         notes: notes.trim() || null,
         photoUrls,
+        reservationId: rental?.id,
       });
 
       if (!result.success) {

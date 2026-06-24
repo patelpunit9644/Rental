@@ -25,6 +25,9 @@ interface Car {
   currentOdo: number;
   status: CarStatus;
   needsService: boolean;
+  seatingCapacity: number;
+  transmission: string;
+  type: string;
 }
 
 interface FleetClientProps {
@@ -50,6 +53,9 @@ export default function FleetClient({ initialCars }: FleetClientProps) {
   const [dailyRate, setDailyRate] = useState('50');
   const [currentOdo, setCurrentOdo] = useState('1000');
   const [status, setStatus] = useState<CarStatus>(CarStatus.AVAILABLE);
+  const [seatingCapacity, setSeatingCapacity] = useState('5');
+  const [transmission, setTransmission] = useState('Automatic');
+  const [type, setType] = useState('Sedan');
 
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState('');
@@ -61,7 +67,9 @@ export default function FleetClient({ initialCars }: FleetClientProps) {
       car.make.toLowerCase().includes(term) ||
       car.model.toLowerCase().includes(term) ||
       car.licensePlate.toLowerCase().includes(term) ||
-      (car.vin && car.vin.toLowerCase().includes(term))
+      (car.vin && car.vin.toLowerCase().includes(term)) ||
+      car.type.toLowerCase().includes(term) ||
+      car.transmission.toLowerCase().includes(term)
     );
   });
 
@@ -75,6 +83,9 @@ export default function FleetClient({ initialCars }: FleetClientProps) {
     setDailyRate('50');
     setCurrentOdo('1000');
     setStatus(CarStatus.AVAILABLE);
+    setSeatingCapacity('5');
+    setTransmission('Automatic');
+    setType('Sedan');
     setFormError('');
     setIsAddOpen(true);
   };
@@ -90,6 +101,9 @@ export default function FleetClient({ initialCars }: FleetClientProps) {
     setDailyRate(car.dailyRate.toString());
     setCurrentOdo(car.currentOdo.toString());
     setStatus(car.status);
+    setSeatingCapacity(car.seatingCapacity.toString());
+    setTransmission(car.transmission);
+    setType(car.type);
     setFormError('');
     setIsEditOpen(true);
   };
@@ -117,6 +131,9 @@ export default function FleetClient({ initialCars }: FleetClientProps) {
         dailyRate: parseFloat(dailyRate) || 0,
         currentOdo: parseInt(currentOdo) || 0,
         status,
+        seatingCapacity: parseInt(seatingCapacity) || 5,
+        transmission,
+        type: type.trim(),
       });
 
       if (!res.success) {
@@ -156,6 +173,9 @@ export default function FleetClient({ initialCars }: FleetClientProps) {
         dailyRate: parseFloat(dailyRate) || 0,
         currentOdo: parseInt(currentOdo) || 0,
         status,
+        seatingCapacity: parseInt(seatingCapacity) || 5,
+        transmission,
+        type: type.trim(),
       });
 
       if (!res.success) {
@@ -249,7 +269,9 @@ export default function FleetClient({ initialCars }: FleetClientProps) {
                   <tr key={car.id} className="hover:bg-slate-850/10 transition">
                     <td className="px-6 py-4">
                       <span className="font-bold text-slate-200 block">{car.year} {car.make} {car.model}</span>
-                      <span className="text-[10px] text-slate-500 font-mono mt-0.5 block">{car.color} {car.vin ? `• VIN: ${car.vin}` : ''}</span>
+                      <span className="text-[10px] text-slate-500 font-mono mt-0.5 block">
+                        {car.color} • {car.seatingCapacity} seats • {car.transmission} • {car.type} {car.vin ? `• VIN: ${car.vin}` : ''}
+                      </span>
                     </td>
                     <td className="px-6 py-4">
                       <span className="bg-slate-950/60 border border-slate-800 text-slate-300 text-xs px-2.5 py-1 rounded font-mono font-bold uppercase">
@@ -344,6 +366,33 @@ export default function FleetClient({ initialCars }: FleetClientProps) {
             <Input label="Starting Odo (km) *" required type="number" value={currentOdo} onChange={(e) => setCurrentOdo(e.target.value)} />
           </div>
 
+          <div className="grid grid-cols-3 gap-4">
+            <Input label="Seats *" required type="number" value={seatingCapacity} onChange={(e) => setSeatingCapacity(e.target.value)} />
+            <Select
+              label="Transmission *"
+              options={[
+                { value: 'Automatic', label: 'Automatic' },
+                { value: 'Manual', label: 'Manual' },
+              ]}
+              value={transmission}
+              onChange={(e) => setTransmission(e.target.value)}
+            />
+            <Select
+              label="Car Type *"
+              options={[
+                { value: 'Sedan', label: 'Sedan' },
+                { value: 'SUV', label: 'SUV' },
+                { value: 'Hatchback', label: 'Hatchback' },
+                { value: 'Coupe', label: 'Coupe' },
+                { value: 'Convertible', label: 'Convertible' },
+                { value: 'Minivan', label: 'Minivan' },
+                { value: 'Pickup Truck', label: 'Pickup Truck' },
+              ]}
+              value={type}
+              onChange={(e) => setType(e.target.value)}
+            />
+          </div>
+
           <Select
             label="Initial Status *"
             options={[
@@ -389,6 +438,33 @@ export default function FleetClient({ initialCars }: FleetClientProps) {
           <div className="grid grid-cols-2 gap-4">
             <Input label="Daily Rate ($) *" required type="number" step="0.01" value={dailyRate} onChange={(e) => setDailyRate(e.target.value)} />
             <Input label="Odometer Reading (km) *" required type="number" value={currentOdo} onChange={(e) => setCurrentOdo(e.target.value)} />
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <Input label="Seats *" required type="number" value={seatingCapacity} onChange={(e) => setSeatingCapacity(e.target.value)} />
+            <Select
+              label="Transmission *"
+              options={[
+                { value: 'Automatic', label: 'Automatic' },
+                { value: 'Manual', label: 'Manual' },
+              ]}
+              value={transmission}
+              onChange={(e) => setTransmission(e.target.value)}
+            />
+            <Select
+              label="Car Type *"
+              options={[
+                { value: 'Sedan', label: 'Sedan' },
+                { value: 'SUV', label: 'SUV' },
+                { value: 'Hatchback', label: 'Hatchback' },
+                { value: 'Coupe', label: 'Coupe' },
+                { value: 'Convertible', label: 'Convertible' },
+                { value: 'Minivan', label: 'Minivan' },
+                { value: 'Pickup Truck', label: 'Pickup Truck' },
+              ]}
+              value={type}
+              onChange={(e) => setType(e.target.value)}
+            />
           </div>
 
           <Select
