@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { sendInvoiceEmail, updateRentalBilling, getShareableInvoiceLink } from '@/actions/rental-actions';
 import { 
-  Search, Eye, Milestone, CheckCircle2, AlertOctagon 
+  Search, Eye, Milestone, CheckCircle2, AlertOctagon, X 
 } from 'lucide-react';
 import { RentalStatus, FuelLevel } from '@prisma/client';
 import { formatFuelLevel } from '@/lib/utils';
@@ -41,6 +41,7 @@ interface Rental {
   customerEmail: string | null;
   customerLicenseNum: string;
   licensePhotoUrl: string;
+  insurancePhotoUrl: string | null;
   pickupDate: Date;
   expectedReturnDate: Date;
   actualReturnDate: Date | null;
@@ -71,6 +72,7 @@ export default function LedgerClient({ initialRentals }: LedgerClientProps) {
   // Modal state
   const [activeRental, setActiveRental] = useState<Rental | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
   // Email input and billing states
   const [emailInput, setEmailInput] = useState('');
@@ -427,24 +429,52 @@ export default function LedgerClient({ initialRentals }: LedgerClientProps) {
                 )}
               </div>
 
-              {/* Driver's License Image */}
-              <div className="space-y-2">
-                <h4 className="font-bold text-white uppercase text-xs tracking-wider text-slate-400">Driver&apos;s License Document</h4>
-                <div className="aspect-video bg-slate-950/50 rounded-2xl border border-slate-850 overflow-hidden relative group">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img 
-                    src={activeRental.licensePhotoUrl} 
-                    alt="Customer Driver's License" 
-                    className="w-full h-full object-cover"
-                  />
-                  <a 
-                    href={activeRental.licensePhotoUrl} 
-                    target="_blank" 
-                    rel="noreferrer" 
-                    className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-xs font-semibold text-white transition cursor-pointer"
-                  >
-                    Open Document Link
-                  </a>
+              {/* Document Images (License & Insurance) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Driver's License Image */}
+                <div className="space-y-2">
+                  <h4 className="font-bold text-white uppercase text-xs tracking-wider text-slate-400">Driver&apos;s License Document</h4>
+                  <div className="aspect-video bg-slate-950/50 rounded-2xl border border-slate-850 overflow-hidden relative group">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img 
+                      src={activeRental.licensePhotoUrl} 
+                      alt="Customer Driver's License" 
+                      className="w-full h-full object-cover"
+                    />
+                    <button 
+                      type="button"
+                      onClick={() => setPreviewImageUrl(activeRental.licensePhotoUrl)} 
+                      className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-xs font-semibold text-white transition cursor-pointer w-full text-center"
+                    >
+                      Open Document Preview
+                    </button>
+                  </div>
+                </div>
+
+                {/* Insurance Card Image */}
+                <div className="space-y-2">
+                  <h4 className="font-bold text-white uppercase text-xs tracking-wider text-slate-400">Insurance Card Document</h4>
+                  {activeRental.insurancePhotoUrl ? (
+                    <div className="aspect-video bg-slate-950/50 rounded-2xl border border-slate-850 overflow-hidden relative group">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img 
+                        src={activeRental.insurancePhotoUrl} 
+                        alt="Customer Insurance Card" 
+                        className="w-full h-full object-cover"
+                      />
+                      <button 
+                        type="button"
+                        onClick={() => setPreviewImageUrl(activeRental.insurancePhotoUrl)} 
+                        className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-xs font-semibold text-white transition cursor-pointer w-full text-center"
+                      >
+                        Open Document Preview
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="aspect-video bg-slate-950/20 rounded-2xl border border-slate-850 border-dashed flex items-center justify-center text-slate-500 text-xs">
+                      No Insurance Document Uploaded
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -476,16 +506,15 @@ export default function LedgerClient({ initialRentals }: LedgerClientProps) {
                   {/* Departure Images */}
                   <div className="grid grid-cols-4 gap-2 pt-2">
                     {departureLog.photoUrls.map((url, i) => (
-                      <a 
+                      <button 
                         key={i} 
-                        href={url} 
-                        target="_blank" 
-                        rel="noreferrer" 
-                        className="aspect-square bg-slate-900 border border-slate-850 rounded-lg overflow-hidden block hover:opacity-85 transition"
+                        type="button"
+                        onClick={() => setPreviewImageUrl(url)}
+                        className="aspect-square bg-slate-900 border border-slate-850 rounded-lg overflow-hidden block hover:opacity-85 transition focus:outline-none"
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={url} alt={`Departure inspection ${i}`} className="w-full h-full object-cover" />
-                      </a>
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -537,16 +566,15 @@ export default function LedgerClient({ initialRentals }: LedgerClientProps) {
                     {/* Return Images */}
                     <div className="grid grid-cols-4 gap-2 pt-2">
                       {returnLog.photoUrls.map((url, i) => (
-                        <a 
+                        <button 
                           key={i} 
-                          href={url} 
-                          target="_blank" 
-                          rel="noreferrer" 
-                          className="aspect-square bg-slate-900 border border-slate-850 rounded-lg overflow-hidden block hover:opacity-85 transition"
+                          type="button"
+                          onClick={() => setPreviewImageUrl(url)}
+                          className="aspect-square bg-slate-900 border border-slate-850 rounded-lg overflow-hidden block hover:opacity-85 transition focus:outline-none"
                         >
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={url} alt={`Return inspection ${i}`} className="w-full h-full object-cover" />
-                        </a>
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -565,6 +593,32 @@ export default function LedgerClient({ initialRentals }: LedgerClientProps) {
           );
         })()}
       </Modal>
+
+      {/* IMAGE PREVIEW LIGHTBOX */}
+      {previewImageUrl && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md transition-all cursor-zoom-out"
+          onClick={() => setPreviewImageUrl(null)}
+        >
+          <div className="relative max-w-4xl max-h-[85vh] w-full flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+            <button 
+              type="button"
+              onClick={() => setPreviewImageUrl(null)}
+              className="absolute top-4 right-4 bg-slate-900/80 hover:bg-slate-800 text-white p-2.5 rounded-full border border-slate-750 transition z-10 hover:scale-105"
+              aria-label="Close image preview"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img 
+              src={previewImageUrl} 
+              alt="Document Preview" 
+              className="rounded-2xl max-w-full max-h-[85vh] object-contain border border-slate-800 shadow-2xl"
+            />
+          </div>
+        </div>
+      )}
 
     </div>
   );

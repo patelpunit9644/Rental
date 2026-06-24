@@ -25,6 +25,7 @@ export interface CheckoutInput {
   customerEmail?: string | null;
   customerLicenseNum: string;
   licensePhotoUrl: string;
+  insurancePhotoUrl: string;
   pickupDate: Date | string;
   expectedReturnDate: Date | string;
   startMileage: number;
@@ -69,7 +70,7 @@ export async function checkoutCar(data: CheckoutInput) {
     await requireAuth();
 
     // 1. Validate inputs
-    if (!data.carId || !data.employeeId || !data.customerName || !data.customerLicenseNum || !data.licensePhotoUrl) {
+    if (!data.carId || !data.employeeId || !data.customerName || !data.customerLicenseNum || !data.licensePhotoUrl || !data.insurancePhotoUrl) {
       return { success: false, error: 'Required fields are missing.' };
     }
 
@@ -130,6 +131,7 @@ export async function checkoutCar(data: CheckoutInput) {
             customerEmail: data.customerEmail,
             customerLicenseNum: data.customerLicenseNum,
             licensePhotoUrl: data.licensePhotoUrl,
+            insurancePhotoUrl: data.insurancePhotoUrl,
             pickupDate,
             expectedReturnDate,
             startMileage: data.startMileage,
@@ -150,6 +152,7 @@ export async function checkoutCar(data: CheckoutInput) {
             customerEmail: data.customerEmail,
             customerLicenseNum: data.customerLicenseNum,
             licensePhotoUrl: data.licensePhotoUrl,
+            insurancePhotoUrl: data.insurancePhotoUrl,
             pickupDate,
             expectedReturnDate,
             startMileage: data.startMileage,

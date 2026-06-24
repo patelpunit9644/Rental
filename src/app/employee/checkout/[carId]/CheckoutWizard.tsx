@@ -60,6 +60,7 @@ export default function CheckoutWizard({ car, employeeId, rental }: CheckoutWiza
   const [customerEmail, setCustomerEmail] = useState(rental?.customerEmail || '');
   const [customerLicenseNum, setCustomerLicenseNum] = useState(rental?.customerLicenseNum || '');
   const [licensePhotoFile, setLicensePhotoFile] = useState<File | null>(null);
+  const [insurancePhotoFile, setInsurancePhotoFile] = useState<File | null>(null);
 
   // Step 2 State: Rental Details
   const [pickupDate, setPickupDate] = useState('');
@@ -128,6 +129,7 @@ export default function CheckoutWizard({ car, employeeId, rental }: CheckoutWiza
     }
     if (!customerLicenseNum.trim()) return 'Driver license number is required.';
     if (!licensePhotoFile) return "Please take or upload a photo of the customer's driver's license.";
+    if (!insurancePhotoFile) return "Please take or upload a photo of the customer's insurance card.";
     return '';
   };
 
@@ -177,6 +179,7 @@ export default function CheckoutWizard({ car, employeeId, rental }: CheckoutWiza
 
     try {
       if (!licensePhotoFile) throw new Error('Driver license photo missing.');
+      if (!insurancePhotoFile) throw new Error('Customer insurance card photo missing.');
       if (conditionPhotoFiles.length === 0) throw new Error('Vehicle condition photos missing.');
 
       // 1. Upload license photo with fallback
@@ -191,6 +194,21 @@ export default function CheckoutWizard({ car, employeeId, rental }: CheckoutWiza
           licensePhotoUrl = 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500';
         } else {
           throw new Error('Firebase Storage upload failed for license photo: ' + (uploadErr as Error).message);
+        }
+      }
+
+      // 1b. Upload insurance card photo with fallback
+      let insurancePhotoUrl = '';
+      try {
+        const insuranceRef = ref(storage, getUniqueFileName('licenses', insurancePhotoFile.name));
+        const insuranceSnapshot = await uploadBytes(insuranceRef, insurancePhotoFile);
+        insurancePhotoUrl = await getDownloadURL(insuranceSnapshot.ref);
+      } catch (uploadErr) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('Firebase Storage upload failed, falling back to mock URL for local testing:', uploadErr);
+          insurancePhotoUrl = 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500';
+        } else {
+          throw new Error('Firebase Storage upload failed for insurance photo: ' + (uploadErr as Error).message);
         }
       }
 
@@ -221,6 +239,7 @@ export default function CheckoutWizard({ car, employeeId, rental }: CheckoutWiza
         customerEmail: customerEmail.trim() || null,
         customerLicenseNum,
         licensePhotoUrl,
+        insurancePhotoUrl,
         pickupDate,
         expectedReturnDate,
         startMileage: parseInt(startMileage) || car.currentOdo,
@@ -321,28 +340,58 @@ export default function CheckoutWizard({ car, employeeId, rental }: CheckoutWiza
             onChange={(e) => setCustomerLicenseNum(e.target.value)}
           />
 
-          <div>
-            <label className="block text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
-              License Photo Upload
-            </label>
-            <div className="relative border-2 border-dashed border-slate-800 hover:border-slate-700 bg-slate-950/20 rounded-2xl p-6 flex flex-col items-center justify-center transition cursor-pointer">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleLicensePhotoChange}
-                className="absolute inset-0 opacity-0 cursor-pointer"
-              />
-              <UploadCloud className="w-8 h-8 text-slate-500 mb-2" />
-              <p className="text-sm font-medium text-slate-300">
-                {licensePhotoFile ? licensePhotoFile.name : 'Take Photo or Choose File'}
-              </p>
-              <p className="text-xs text-slate-500 mt-1">Camera/Gallery accepted</p>
-            </div>
-            {licensePhotoFile && (
-              <div className="mt-3 flex items-center gap-2 text-xs text-emerald-400 font-semibold bg-emerald-500/5 border border-emerald-500/10 p-2 rounded-lg">
-                <CheckCircle className="w-4 h-4" /> Ready for upload
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
+                License Photo Upload *
+              </label>
+              <div className="relative border-2 border-dashed border-slate-800 hover:border-slate-700 bg-slate-950/20 rounded-2xl p-6 flex flex-col items-center justify-center transition cursor-pointer">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLicensePhotoChange}
+                  className="absolute inset-0 opacity-0 cursor-pointer"
+                />
+                <UploadCloud className="w-8 h-8 text-slate-500 mb-2" />
+                <p className="text-sm font-medium text-slate-300 text-center truncate w-full px-2">
+                  {licensePhotoFile ? licensePhotoFile.name : 'Take Photo or Choose File'}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">Camera/Gallery accepted</p>
               </div>
-            )}
+              {licensePhotoFile && (
+                <div className="mt-3 flex items-center gap-2 text-xs text-emerald-400 font-semibold bg-emerald-500/5 border border-emerald-500/10 p-2 rounded-lg">
+                  <CheckCircle className="w-4 h-4" /> Ready for upload
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
+                Insurance Card Upload *
+              </label>
+              <div className="relative border-2 border-dashed border-slate-800 hover:border-slate-700 bg-slate-950/20 rounded-2xl p-6 flex flex-col items-center justify-center transition cursor-pointer">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      setInsurancePhotoFile(e.target.files[0]);
+                    }
+                  }}
+                  className="absolute inset-0 opacity-0 cursor-pointer"
+                />
+                <UploadCloud className="w-8 h-8 text-slate-500 mb-2" />
+                <p className="text-sm font-medium text-slate-300 text-center truncate w-full px-2">
+                  {insurancePhotoFile ? insurancePhotoFile.name : 'Take Photo or Choose File'}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">Camera/Gallery accepted</p>
+              </div>
+              {insurancePhotoFile && (
+                <div className="mt-3 flex items-center gap-2 text-xs text-emerald-400 font-semibold bg-emerald-500/5 border border-emerald-500/10 p-2 rounded-lg">
+                  <CheckCircle className="w-4 h-4" /> Ready for upload
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

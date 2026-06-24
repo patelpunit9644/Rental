@@ -41,6 +41,7 @@ interface Rental {
   customerEmail: string | null;
   customerLicenseNum: string;
   licensePhotoUrl: string;
+  insurancePhotoUrl: string | null;
   pickupDate: Date;
   expectedReturnDate: Date;
   actualReturnDate: Date | null;

@@ -75,6 +75,7 @@ model Rental {
   customerEmail      String?
   customerLicenseNum String
   licensePhotoUrl    String       // Firebase Storage URL
+  insurancePhotoUrl  String?      // Firebase Storage URL for Customer's Insurance Card
   
   pickupDate         DateTime
   expectedReturnDate DateTime
